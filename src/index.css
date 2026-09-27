@@ -1,1 +1,20 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600&display=swap");
+
+@theme {
+  --color-paper: #f7f5f1;
+  --color-ink: #1f2430;
+  --color-ink-soft: #5b6272;
+  --color-rule: #d8d3c7;
+  --color-marigold: #e8a33d;
+  --color-error: #b3432b;
+
+  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
