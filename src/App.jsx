@@ -6,6 +6,7 @@ import DocumentWorkspacePage from "./pages/DocumentWorkspacePage.jsx";
 import QuizAttemptPage from "./pages/QuizAttemptPage.jsx";
 import AttemptResultsPage from "./pages/AttemptResultsPage.jsx";
 import FlashcardReviewPage from "./pages/FlashcardReviewPage.jsx";
+import AnalyticsPage from "./pages/AnalyticsPage.jsx";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
         <Route path="/quizzes/:id/attempt" element={<QuizAttemptPage />} />
         <Route path="/attempts/:id" element={<AttemptResultsPage />} />
         <Route path="/flashcards/review" element={<FlashcardReviewPage />} />
+        <Route path="/analytics" element={<AnalyticsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
