@@ -7,6 +7,8 @@ import QuizAttemptPage from "./pages/QuizAttemptPage.jsx";
 import AttemptResultsPage from "./pages/AttemptResultsPage.jsx";
 import FlashcardReviewPage from "./pages/FlashcardReviewPage.jsx";
 import AnalyticsPage from "./pages/AnalyticsPage.jsx";
+import StudyPlansListPage from "./pages/StudyPlansListPage.jsx";
+import StudyPlanPage from "./pages/StudyPlanPage.jsx";
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
         <Route path="/attempts/:id" element={<AttemptResultsPage />} />
         <Route path="/flashcards/review" element={<FlashcardReviewPage />} />
         <Route path="/analytics" element={<AnalyticsPage />} />
+        <Route path="/study-plans" element={<StudyPlansListPage />} />
+        <Route path="/study-plans/:id" element={<StudyPlanPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
