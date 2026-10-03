@@ -2,7 +2,7 @@ import { Sparkles, CheckCircle2 } from "lucide-react";
 
 export default function AuthLayout({ eyebrow, headline, children }) {
   return (
-    <div className="min-h-screen grid md:grid-cols-2">
+    <div className="flex-1 grid md:grid-cols-2">
       {/* Left: dark hero with a floating product moment */}
       <div className="hidden md:flex flex-col justify-between p-12 lg:p-16 bg-ink relative overflow-hidden">
         {/* faint ruled texture, kept subtle so it doesn't compete with the card */}

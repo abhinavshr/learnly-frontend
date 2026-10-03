@@ -110,15 +110,6 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-paper">
-      {/* Topbar */}
-      <header className="border-b border-rule bg-white">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <span className="font-serif text-xl font-semibold text-ink">Learnly</span>
-          <div className="w-8 h-8 rounded-full bg-ink text-white flex items-center justify-center text-sm font-medium">
-            A
-          </div>
-        </div>
-      </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
         <div className="flex items-end justify-between mb-8">
