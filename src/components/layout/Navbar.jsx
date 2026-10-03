@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { BookOpen, Target, Calendar, ChevronDown, LogOut, User } from "lucide-react";
-import { logout } from "../../feature/auth/authSlice.js";
+import { logout } from "../../features/auth/authSlice.js";
 
 const NAV_LINKS = [
   { to: "/", label: "Documents", icon: BookOpen, end: true },

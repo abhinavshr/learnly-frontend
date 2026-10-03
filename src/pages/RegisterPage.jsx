@@ -4,7 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { User, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "../components/AuthLayout.jsx";
 import FormField from "../components/FormField.jsx";
-import { registerUser, clearAuthError } from "../feature/auth/authSlice.js";
+import { registerUser, clearAuthError } from "../features/auth/authSlice.js";
 
 export default function RegisterPage() {
   const dispatch = useDispatch();
