@@ -20,6 +20,18 @@ export const fetchDocuments = createAsyncThunk(
   }
 );
 
+export const fetchDocumentById = createAsyncThunk(
+  "documents/fetchDocumentById",
+  async (id, { rejectWithValue }) => {
+    try {
+      const res = await apiClient.get(`/documents/${id}`);
+      return res.data.document;
+    } catch (error) {
+      return rejectWithValue(extractErrorMessage(error));
+    }
+  }
+);
+
 export const uploadDocument = createAsyncThunk(
   "documents/uploadDocument",
   async ({ file, title }, { rejectWithValue }) => {
@@ -50,11 +62,16 @@ export const deleteDocument = createAsyncThunk(
 
 const initialState = {
   items: [],
-  status: "idle", // idle | loading | succeeded | failed
+  status: "idle",
   error: null,
   uploadStatus: "idle",
   uploadError: null,
   deletingId: null,
+  current: {
+    data: null,
+    status: "idle",
+    error: null,
+  },
 };
 
 const documentsSlice = createSlice({
@@ -67,6 +84,9 @@ const documentsSlice = createSlice({
     resetUploadStatus(state) {
       state.uploadStatus = "idle";
       state.uploadError = null;
+    },
+    clearCurrentDocument(state) {
+      state.current = { data: null, status: "idle", error: null };
     },
   },
   extraReducers: (builder) => {
@@ -84,13 +104,26 @@ const documentsSlice = createSlice({
         state.error = action.payload;
       })
 
+      .addCase(fetchDocumentById.pending, (state) => {
+        state.current.status = "loading";
+        state.current.error = null;
+      })
+      .addCase(fetchDocumentById.fulfilled, (state, action) => {
+        state.current.status = "succeeded";
+        state.current.data = action.payload;
+      })
+      .addCase(fetchDocumentById.rejected, (state, action) => {
+        state.current.status = "failed";
+        state.current.error = action.payload;
+      })
+
       .addCase(uploadDocument.pending, (state) => {
         state.uploadStatus = "loading";
         state.uploadError = null;
       })
       .addCase(uploadDocument.fulfilled, (state, action) => {
         state.uploadStatus = "succeeded";
-        state.items.unshift(action.payload); // newest first, matches the backend's ordering
+        state.items.unshift(action.payload);
       })
       .addCase(uploadDocument.rejected, (state, action) => {
         state.uploadStatus = "failed";
@@ -106,10 +139,9 @@ const documentsSlice = createSlice({
       })
       .addCase(deleteDocument.rejected, (state) => {
         state.deletingId = null;
-        // Error surfaces inline; see UploadModal/DashboardPage below for how it could be shown
       });
   },
 });
 
-export const { clearUploadError, resetUploadStatus } = documentsSlice.actions;
+export const { clearUploadError, resetUploadStatus, clearCurrentDocument } = documentsSlice.actions;
 export default documentsSlice.reducer;
