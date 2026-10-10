@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { loadSummary, regenerateSummary } from "../../features/summary/summarySlice.js";
+import MarkdownContent from "../../components/MarkdownContent.jsx";
 
 const LENGTHS = [
   { id: "short", label: "Short" },
@@ -6,8 +10,29 @@ const LENGTHS = [
   { id: "detailed", label: "Detailed" },
 ];
 
-export default function SummaryTab() {
+export default function SummaryTab({ documentId }) {
+  const dispatch = useDispatch();
   const [length, setLength] = useState("medium");
+
+  const key = `${documentId}:${length}`;
+  const entry = useSelector((state) => state.summary.byKey[key]);
+
+  const isLoading = entry?.status === "loading";
+  const error = entry?.error;
+  const hasResult = entry?.status === "succeeded" && entry.content;
+
+  useEffect(() => {
+    if (!entry || entry.status === "idle") {
+      dispatch(loadSummary({ documentId, length }));
+    }
+    // entry is intentionally excluded: including it would re-trigger on every
+    // status change and cause a fetch loop. Only documentId/length should re-fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, documentId, length]);
+
+  function handleRegenerate() {
+    dispatch(regenerateSummary({ documentId, length }));
+  }
 
   return (
     <div className="max-w-2xl">
@@ -17,6 +42,7 @@ export default function SummaryTab() {
             <button
               key={l.id}
               onClick={() => setLength(l.id)}
+              disabled={isLoading}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors
                 ${length === l.id ? "bg-ink text-white" : "text-ink-soft hover:text-ink"}`}
             >
@@ -24,34 +50,40 @@ export default function SummaryTab() {
             </button>
           ))}
         </div>
-        <button className="text-sm text-ink-soft hover:text-ink transition-colors">
+        <button
+          onClick={handleRegenerate}
+          disabled={isLoading}
+          className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink
+            transition-colors disabled:opacity-50 disabled:pointer-events-none"
+        >
+          <RotateCcw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
           Regenerate
         </button>
       </div>
 
-      <article className="bg-white border border-rule rounded-xl p-8">
-        <h2 className="font-serif text-2xl font-semibold text-ink mb-3">Overview</h2>
-        <p className="text-ink leading-relaxed mb-6">
-          This document specifies a ticketing platform for tournaments, covering FIFA
-          formats (Pro Clubs, Box, 1v1, LAN) alongside general event ticketing, user
-          roles, payments, and the database design needed for an MVP.
-        </p>
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-error bg-error/10 border border-error/30 rounded-lg px-4 py-3 mb-6">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
-        <h2 className="font-serif text-2xl font-semibold text-ink mb-3">Key points</h2>
-        <ul className="list-disc list-inside text-ink leading-relaxed space-y-1.5 mb-6">
-          <li>Three user types: Super Admin, Event Organizer, Attendee (page 1)</li>
-          <li>Four tournament formats, each with its own required fields (page 8)</li>
-          <li>Orders move through Pending, Paid, Cancelled, Refunded (page 4)</li>
-          <li>Nepal gateways (eSewa, Khalti, FonePay) plus Stripe and PayPal globally (page 5)</li>
-          <li>MVP covers 10 core tables; reviews and coupons are Phase 2 (page 16)</li>
-        </ul>
+      {isLoading && (
+        <div className="bg-white border border-rule rounded-xl py-16 text-center">
+          <Loader2 className="w-6 h-6 text-ink-soft animate-spin mx-auto mb-3" />
+          <p className="text-sm text-ink-soft">
+            {length === "detailed"
+              ? "This can take a little longer for a detailed summary..."
+              : "Summarizing your document..."}
+          </p>
+        </div>
+      )}
 
-        <h2 className="font-serif text-2xl font-semibold text-ink mb-3">Important terms</h2>
-        <ul className="list-disc list-inside text-ink leading-relaxed space-y-1.5">
-          <li><span className="font-medium">Box Tournament</span>: a team-based format bought by a captain</li>
-          <li><span className="font-medium">MVP</span>: the minimum feature set for version 1</li>
-        </ul>
-      </article>
+      {!isLoading && hasResult && (
+        <article className="bg-white border border-rule rounded-xl p-8">
+          <MarkdownContent content={entry.content} />
+        </article>
+      )}
     </div>
   );
 }
