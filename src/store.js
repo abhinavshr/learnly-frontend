@@ -7,6 +7,7 @@ import summaryReducer from "./features/summary/summarySlice.js";
 import quizReducer from "./features/quiz/quizSlice.js";
 import attemptReducer from "./features/attempt/attemptSlice.js";
 import analyticsReducer from "./features/analytics/analyticsSlice.js";
+import flashcardsReducer from "./features/flashcards/flashcardsSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -18,5 +19,6 @@ export const store = configureStore({
     quiz: quizReducer,
     attempt: attemptReducer,
     analytics: analyticsReducer,
+    flashcards: flashcardsReducer,
   },
 });

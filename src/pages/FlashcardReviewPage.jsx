@@ -1,34 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
-import { X, RotateCw, Check, Meh, Zap, PartyPopper } from "lucide-react";
-
-// Static mock — matches the shape GET /api/flashcards/due returns
-const DUE_CARDS = [
-  {
-    id: 1,
-    front: "Who purchases tickets in a Box Tournament?",
-    back: "The team captain, who also provides the team name and each member's details.",
-    documentTitle: "Ticketing Documentation",
-  },
-  {
-    id: 2,
-    front: "What are the four tournament types?",
-    back: "Pro Clubs (11v11), Box Tournament, 1v1 Tournament, and LAN Tournament.",
-    documentTitle: "Ticketing Documentation",
-  },
-  {
-    id: 3,
-    front: "What organelle is responsible for producing ATP?",
-    back: "Mitochondria — often called the powerhouse of the cell.",
-    documentTitle: "Cell Biology — Chapter 4",
-  },
-  {
-    id: 4,
-    front: "What data verifies a LAN Tournament attendee's age?",
-    back: "Date of Birth, required specifically for age verification at the physical venue.",
-    documentTitle: "Ticketing Documentation",
-  },
-];
+import { useDispatch, useSelector } from "react-redux";
+import { X, RotateCw, Check, Meh, Zap, PartyPopper, Loader2, AlertCircle } from "lucide-react";
+import { fetchDueFlashcards, reviewFlashcard } from "../features/flashcards/flashcardsSlice.js";
 
 const RATINGS = [
   { id: 0, key: "1", label: "Forgot", icon: X, color: "error" },
@@ -44,34 +18,48 @@ const RATING_STYLES = {
 };
 
 export default function FlashcardReviewPage() {
-  const [queue, setQueue] = useState(DUE_CARDS);
+  const dispatch = useDispatch();
+  const { cards, status, error } = useSelector((state) => state.flashcards.due);
+
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [tally, setTally] = useState({ 0: 0, 1: 0, 2: 0, 3: 0 });
   const [done, setDone] = useState(false);
+  const [isRating, setIsRating] = useState(false);
 
-  const total = DUE_CARDS.length;
-  const card = queue[index];
+  const total = cards.length;
+  const card = cards[index];
+
+  useEffect(() => {
+    dispatch(fetchDueFlashcards());
+  }, [dispatch]);
 
   const rate = useCallback(
-    (ratingId) => {
-      if (!flipped || done) return;
-      setTally((t) => ({ ...t, [ratingId]: t[ratingId] + 1 }));
+    async (ratingId) => {
+      if (!flipped || done || isRating || !card) return;
+      setIsRating(true);
 
-      if (index + 1 >= total) {
-        setDone(true);
-      } else {
-        setFlipped(false);
-        setIndex((i) => i + 1);
+      const result = await dispatch(reviewFlashcard({ id: card.id, quality: ratingId }));
+      setIsRating(false);
+
+      if (reviewFlashcard.fulfilled.match(result)) {
+        setTally((t) => ({ ...t, [ratingId]: t[ratingId] + 1 }));
+
+        if (index + 1 >= total) {
+          setDone(true);
+        } else {
+          setFlipped(false);
+          setIndex((i) => i + 1);
+        }
       }
+      // on failure, stay on the same card so the student can retry
     },
-    [flipped, done, index, total]
+    [flipped, done, isRating, card, index, total, dispatch]
   );
 
-  // Keyboard shortcuts: space/enter to flip, 1-4 to rate
   useEffect(() => {
     function handleKey(e) {
-      if (done) return;
+      if (done || status !== "succeeded") return;
       if (e.code === "Space" || e.key === "Enter") {
         e.preventDefault();
         setFlipped((f) => !f);
@@ -82,7 +70,50 @@ export default function FlashcardReviewPage() {
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [rate, done]);
+  }, [rate, done, status]);
+
+  if (status === "loading" || status === "idle") {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-ink-soft animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center px-6">
+        <div className="max-w-sm w-full text-center">
+          <AlertCircle className="w-6 h-6 text-error mx-auto mb-3" />
+          <p className="text-sm text-error mb-6">{error}</p>
+          <Link to="/" className="rounded-lg border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-white transition-colors">
+            Back to documents
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (total === 0) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center px-6">
+        <div className="max-w-sm w-full text-center">
+          <div className="w-14 h-14 rounded-full bg-marigold/10 flex items-center justify-center mx-auto mb-5">
+            <PartyPopper className="w-6 h-6 text-marigold" />
+          </div>
+          <h1 className="font-serif text-2xl font-semibold text-ink mb-2">You're all caught up</h1>
+          <p className="text-ink-soft mb-8">No flashcards are due for review right now.</p>
+          <Link
+            to="/"
+            className="inline-flex w-full items-center justify-center rounded-lg bg-ink text-white
+              font-medium py-2.5 hover:bg-ink/90 active:scale-[0.99] transition-all"
+          >
+            Back to documents
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (done) {
     const reviewedWell = tally[2] + tally[3];
@@ -118,9 +149,16 @@ export default function FlashcardReviewPage() {
     );
   }
 
+  if (!card) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-ink-soft animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-paper flex flex-col">
-      {/* Minimal top bar: exit + progress */}
       <header className="border-b border-rule bg-white sticky top-0 z-10">
         <div className="max-w-xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link to="/" className="text-ink-soft hover:text-ink transition-colors" aria-label="Exit review">
@@ -140,7 +178,6 @@ export default function FlashcardReviewPage() {
         </div>
       </header>
 
-      {/* Card */}
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-lg">
           <p className="text-sm text-ink-soft text-center mb-4">{card.documentTitle}</p>
@@ -166,12 +203,12 @@ export default function FlashcardReviewPage() {
                 <button
                   key={r.id}
                   onClick={() => rate(r.id)}
-                  disabled={!flipped}
+                  disabled={!flipped || isRating}
                   className={`flex flex-col items-center gap-1 rounded-lg border border-rule py-3
                     text-ink-soft transition-colors disabled:opacity-40 disabled:pointer-events-none
                     ${RATING_STYLES[r.color]}`}
                 >
-                  <Icon className="w-4.5 h-4.5" />
+                  {isRating ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> : <Icon className="w-4.5 h-4.5" />}
                   <span className="text-xs font-medium">{r.label}</span>
                   <span className="text-[10px] text-ink-soft/60">{r.key}</span>
                 </button>
