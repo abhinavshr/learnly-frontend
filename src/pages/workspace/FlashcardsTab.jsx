@@ -1,69 +1,152 @@
-import { useState } from "react";
-import { RotateCw, X, Meh, Check, Zap } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { RotateCw, Loader2, AlertCircle, Layers, Trash2, Plus } from "lucide-react";
+import {
+  fetchFlashcardsForDocument,
+  generateFlashcards,
+  deleteFlashcard,
+} from "../../features/flashcards/flashcardsSlice.js";
 
-const MOCK_CARDS = [
-  { front: "Who purchases tickets in a Box Tournament?", back: "The team captain, who also provides the team name and each member's details." },
-  { front: "What are the four tournament types?", back: "Pro Clubs (11v11), Box Tournament, 1v1 Tournament, and LAN Tournament." },
-  { front: "What data verifies a LAN Tournament attendee's age?", back: "Date of Birth, which is required specifically for age verification at the physical venue." },
-];
+export default function FlashcardsTab({ documentId }) {
+  const dispatch = useDispatch();
+  const entry = useSelector((state) => state.flashcards.byDocument[documentId]);
 
-const RATINGS = [
-  { id: 0, label: "Forgot", icon: X, className: "hover:bg-error/10 hover:text-error hover:border-error" },
-  { id: 1, label: "Hard", icon: Meh, className: "hover:bg-marigold/10 hover:text-marigold hover:border-marigold" },
-  { id: 2, label: "Good", icon: Check, className: "hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-600" },
-  { id: 3, label: "Easy", icon: Zap, className: "hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-600" },
-];
-
-export default function FlashcardsTab() {
-  const [index, setIndex] = useState(0);
+  const [count, setCount] = useState(10);
+  const [previewIndex, setPreviewIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const card = MOCK_CARDS[index];
 
-  function handleRate() {
-    setFlipped(false);
-    setIndex((i) => (i + 1) % MOCK_CARDS.length);
+  const cards = entry?.cards ?? [];
+  const listStatus = entry?.listStatus ?? "idle";
+  const isGenerating = entry?.generateStatus === "loading";
+  const generateError = entry?.generateError;
+
+  useEffect(() => {
+    dispatch(fetchFlashcardsForDocument(documentId));
+  }, [dispatch, documentId]);
+
+  // Keep the preview pointer in range as cards are generated/deleted
+  useEffect(() => {
+    if (previewIndex >= cards.length) setPreviewIndex(0);
+  }, [cards.length, previewIndex]);
+
+  function handleGenerate() {
+    dispatch(generateFlashcards({ documentId, count: Number(count) }));
   }
+
+  function handleDelete(id) {
+    dispatch(deleteFlashcard({ id, documentId }));
+    setFlipped(false);
+  }
+
+  const card = cards[previewIndex];
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-ink-soft">
-          Card {index + 1} of {MOCK_CARDS.length} due today
-        </p>
-        <p className="text-sm text-ink-soft">Ticketing Documentation</p>
+      <div className="bg-white border border-rule rounded-xl p-6 mb-8">
+        <h2 className="font-serif text-xl font-semibold text-ink mb-4">Generate flashcards</h2>
+
+        {generateError && (
+          <div className="flex items-center gap-2 text-sm text-error bg-error/10 border border-error/30 rounded-lg px-4 py-3 mb-4">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {generateError}
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <input
+            type="number"
+            min={3}
+            max={30}
+            value={count}
+            onChange={(e) => setCount(e.target.value)}
+            disabled={isGenerating}
+            className="w-24 rounded-lg border border-rule bg-white px-3 py-2 text-ink
+              focus:outline-none focus:ring-4 focus:ring-marigold/20 focus:border-marigold disabled:bg-paper"
+          />
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating}
+            className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-ink text-white font-medium
+              px-5 py-2.5 hover:bg-ink/90 active:scale-[0.99] transition-all
+              disabled:opacity-50 disabled:pointer-events-none"
+          >
+            {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+            {isGenerating ? "Generating..." : "Generate cards"}
+          </button>
+        </div>
       </div>
 
-      <button
-        onClick={() => setFlipped((f) => !f)}
-        className="w-full bg-white border border-rule rounded-2xl px-8 py-16 text-center
-          hover:border-marigold/50 transition-colors focus:outline-none focus:ring-4 focus:ring-marigold/20"
-      >
-        <p className="font-serif text-2xl text-ink leading-snug">
-          {flipped ? card.back : card.front}
-        </p>
-        <div className="flex items-center justify-center gap-1.5 text-xs text-ink-soft mt-6">
-          <RotateCw className="w-3.5 h-3.5" />
-          {flipped ? "Showing answer" : "Tap to reveal answer"}
+      {listStatus === "loading" && (
+        <div className="rounded-xl border border-rule bg-white py-16 text-center">
+          <Loader2 className="w-6 h-6 text-ink-soft animate-spin mx-auto" />
         </div>
-      </button>
+      )}
 
-      {flipped && (
-        <div className="grid grid-cols-4 gap-2 mt-5">
-          {RATINGS.map((r) => {
-            const Icon = r.icon;
-            return (
-              <button
-                key={r.id}
-                onClick={handleRate}
-                className={`flex flex-col items-center gap-1 rounded-lg border border-rule py-3
-                  text-ink-soft transition-colors ${r.className}`}
-              >
-                <Icon className="w-4.5 h-4.5" />
-                <span className="text-xs font-medium">{r.label}</span>
-              </button>
-            );
-          })}
+      {listStatus === "succeeded" && cards.length === 0 && (
+        <div className="rounded-xl border border-dashed border-rule bg-white py-16 text-center">
+          <Layers className="w-6 h-6 text-ink-soft mx-auto mb-2" />
+          <p className="text-sm text-ink-soft">No flashcards yet — generate some above.</p>
         </div>
+      )}
+
+      {listStatus === "succeeded" && cards.length > 0 && card && (
+        <>
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-ink-soft">
+              Card {previewIndex + 1} of {cards.length}
+            </p>
+            <button
+              onClick={() => handleDelete(card.id)}
+              className="inline-flex items-center gap-1.5 text-sm text-error hover:text-error/80 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete this card
+            </button>
+          </div>
+
+          <button
+            onClick={() => setFlipped((f) => !f)}
+            className="w-full bg-white border border-rule rounded-2xl px-8 py-16 text-center
+              hover:border-marigold/50 transition-colors focus:outline-none focus:ring-4 focus:ring-marigold/20"
+          >
+            <p className="font-serif text-2xl text-ink leading-snug">
+              {flipped ? card.back : card.front}
+            </p>
+            <div className="flex items-center justify-center gap-1.5 text-xs text-ink-soft mt-6">
+              <RotateCw className="w-3.5 h-3.5" />
+              {flipped ? "Showing answer" : "Tap to reveal answer"}
+            </div>
+          </button>
+
+          <div className="flex items-center justify-between mt-4">
+            <button
+              onClick={() => {
+                setFlipped(false);
+                setPreviewIndex((i) => (i - 1 + cards.length) % cards.length);
+              }}
+              className="text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+            >
+              Previous
+            </button>
+            <Link
+              to="/flashcards/review"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-marigold text-ink font-medium
+                px-4 py-2 text-sm hover:bg-marigold/90 transition-colors"
+            >
+              Start full review session
+            </Link>
+            <button
+              onClick={() => {
+                setFlipped(false);
+                setPreviewIndex((i) => (i + 1) % cards.length);
+              }}
+              className="text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
