@@ -13,7 +13,7 @@ export const startAttempt = createAsyncThunk(
   async ({ quizId, mode, timeLimitMinutes }, { rejectWithValue }) => {
     try {
       const res = await apiClient.post(`/quizzes/${quizId}/attempts`, { mode, timeLimitMinutes });
-      return res.data; // { attempt, questions }
+      return res.data;
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error));
     }
@@ -25,6 +25,18 @@ export const submitAttempt = createAsyncThunk(
   async ({ attemptId, answers }, { rejectWithValue }) => {
     try {
       const res = await apiClient.post(`/attempts/${attemptId}/submit`, { answers });
+      return res.data;
+    } catch (error) {
+      return rejectWithValue(extractErrorMessage(error));
+    }
+  }
+);
+
+export const fetchAttemptResults = createAsyncThunk(
+  "attempt/fetchAttemptResults",
+  async (attemptId, { rejectWithValue }) => {
+    try {
+      const res = await apiClient.get(`/attempts/${attemptId}`);
       return res.data; // { attempt, topics, results }
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error));
@@ -33,17 +45,24 @@ export const submitAttempt = createAsyncThunk(
 );
 
 const initialState = {
-  // the attempt currently in progress
   attemptId: null,
   quizId: null,
   mode: null,
   timeLimitSeconds: null,
   totalQuestions: 0,
   questions: [],
-  startStatus: "idle", // idle | loading | succeeded | failed
+  startStatus: "idle",
   startError: null,
   submitStatus: "idle",
   submitError: null,
+
+  results: {
+    attempt: null,
+    topics: [],
+    results: [],
+    status: "idle",
+    error: null,
+  },
 };
 
 const attemptSlice = createSlice({
@@ -52,6 +71,9 @@ const attemptSlice = createSlice({
   reducers: {
     resetAttempt() {
       return initialState;
+    },
+    resetResults(state) {
+      state.results = initialState.results;
     },
   },
   extraReducers: (builder) => {
@@ -87,9 +109,24 @@ const attemptSlice = createSlice({
       .addCase(submitAttempt.rejected, (state, action) => {
         state.submitStatus = "failed";
         state.submitError = action.payload;
+      })
+
+      .addCase(fetchAttemptResults.pending, (state) => {
+        state.results.status = "loading";
+        state.results.error = null;
+      })
+      .addCase(fetchAttemptResults.fulfilled, (state, action) => {
+        state.results.status = "succeeded";
+        state.results.attempt = action.payload.attempt;
+        state.results.topics = action.payload.topics;
+        state.results.results = action.payload.results;
+      })
+      .addCase(fetchAttemptResults.rejected, (state, action) => {
+        state.results.status = "failed";
+        state.results.error = action.payload;
       });
   },
 });
 
-export const { resetAttempt } = attemptSlice.actions;
+export const { resetAttempt, resetResults } = attemptSlice.actions;
 export default attemptSlice.reducer;
