@@ -3,6 +3,7 @@ import authReducer from "./features/auth/authSlice.js";
 import documentsReducer from "./features/documents/documentsSlice.js";
 import qaReducer from "./features/qa/qaSlice.js";
 import explainReducer from "./features/explain/explainSlice.js";
+import summaryReducer from "./features/summary/summarySlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -10,5 +11,6 @@ export const store = configureStore({
     documents: documentsReducer,
     qa: qaReducer,
     explain: explainReducer,
+    summary: summaryReducer,
   },
 });
