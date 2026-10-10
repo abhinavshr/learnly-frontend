@@ -4,6 +4,7 @@ import documentsReducer from "./features/documents/documentsSlice.js";
 import qaReducer from "./features/qa/qaSlice.js";
 import explainReducer from "./features/explain/explainSlice.js";
 import summaryReducer from "./features/summary/summarySlice.js";
+import quizReducer from "./features/quiz/quizSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -12,5 +13,6 @@ export const store = configureStore({
     qa: qaReducer,
     explain: explainReducer,
     summary: summaryReducer,
+    quiz: quizReducer,
   },
 });
