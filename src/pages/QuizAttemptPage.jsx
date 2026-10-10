@@ -1,43 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { X, Clock, ChevronRight, ChevronLeft } from "lucide-react";
-
-// Static mock data — matches the shape /api/quizzes/:id/attempts returns
-const MODE = "exam"; // toggle to "practice" to see the untimed variant
-const TIME_LIMIT_SECONDS = MODE === "exam" ? 5 * 60 : null;
-
-const QUESTIONS = [
-  {
-    id: 1,
-    question: "Who is responsible for purchasing tickets in a Box Tournament?",
-    options: ["Each team member individually", "The event organizer", "The Super Admin", "The team captain"],
-    topic: "Tournament formats",
-  },
-  {
-    id: 2,
-    question: "Which payment gateway is a global gateway rather than Nepal-specific?",
-    options: ["eSewa", "Khalti", "Stripe", "FonePay"],
-    topic: "Payments",
-  },
-  {
-    id: 3,
-    question: "Which of these is NOT a valid order status in the system?",
-    options: ["Pending", "Paid", "Shipped", "Refunded"],
-    topic: "Order statuses",
-  },
-  {
-    id: 4,
-    question: "How many position preferences must a Pro Clubs player provide?",
-    options: ["1", "2", "3", "5"],
-    topic: "Tournament formats",
-  },
-  {
-    id: 5,
-    question: "What is encrypted to generate an attendee's check-in QR code?",
-    options: ["Email + password", "user_id + event_id + ticket_id", "Order number + amount", "Gamertag + platform"],
-    topic: "Check-in",
-  },
-];
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { X, Clock, ChevronRight, ChevronLeft, Loader2, AlertCircle } from "lucide-react";
+import { startAttempt, submitAttempt, resetAttempt } from "../features/attempt/attemptSlice.js";
 
 const LETTERS = ["A", "B", "C", "D"];
 
@@ -49,23 +14,65 @@ function formatTime(seconds) {
 
 export default function QuizAttemptPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get("mode") === "exam" ? "exam" : "practice";
+
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const {
+    attemptId,
+    questions,
+    totalQuestions,
+    timeLimitSeconds,
+    startStatus,
+    startError,
+    submitStatus,
+    submitError,
+  } = useSelector((state) => state.attempt);
 
   const [index, setIndex] = useState(0);
   const [answers, setAnswers] = useState({}); // { questionId: optionIndex }
-  const [timeLeft, setTimeLeft] = useState(TIME_LIMIT_SECONDS);
+  const [timeLeft, setTimeLeft] = useState(null);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const hasSubmittedRef = useRef(false);
 
-  const question = QUESTIONS[index];
-  const total = QUESTIONS.length;
-  const answeredCount = Object.keys(answers).length;
+  // Start the attempt once on mount, clean up Redux state on leave
+  useEffect(() => {
+    dispatch(startAttempt({ quizId: id, mode, timeLimitMinutes: undefined }));
+    return () => dispatch(resetAttempt());
+  }, [dispatch, id, mode]);
+
+  // Seed the countdown once the real time limit arrives from the backend
+  useEffect(() => {
+    if (timeLimitSeconds != null) setTimeLeft(timeLimitSeconds);
+  }, [timeLimitSeconds]);
+
+  const total = totalQuestions || questions.length;
+  const question = questions[index];
   const isLast = index === total - 1;
+  const isSubmitting = submitStatus === "loading";
+
+  const buildAnswersPayload = useCallback(
+    () =>
+      questions.map((q) => ({
+        questionId: q.id,
+        selectedIndex: answers[q.id] ?? null,
+      })),
+    [questions, answers]
+  );
 
   const handleSubmit = useCallback(() => {
-    // No backend call yet. In practice this posts `answers` to
-    // /api/attempts/:id/submit and navigates to /attempts/:id
-    navigate(`/attempts/${id}`);
-  }, [id, navigate]);
+    if (hasSubmittedRef.current || !attemptId) return;
+    hasSubmittedRef.current = true;
+    dispatch(submitAttempt({ attemptId, answers: buildAnswersPayload() })).then((result) => {
+      if (submitAttempt.fulfilled.match(result)) {
+        navigate(`/attempts/${attemptId}`);
+      } else {
+        hasSubmittedRef.current = false; // allow retry on failure
+      }
+    });
+  }, [attemptId, dispatch, buildAnswersPayload, navigate]);
 
   // Exam timer
   useEffect(() => {
@@ -94,11 +101,41 @@ export default function QuizAttemptPage() {
     setIndex((i) => Math.max(0, i - 1));
   }
 
+  if (startStatus === "loading" || startStatus === "idle") {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-6 h-6 text-ink-soft animate-spin mx-auto mb-3" />
+          <p className="text-sm text-ink-soft">Setting up your quiz...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (startStatus === "failed") {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center px-6">
+        <div className="max-w-sm w-full text-center">
+          <AlertCircle className="w-6 h-6 text-error mx-auto mb-3" />
+          <p className="text-sm text-error mb-6">{startError}</p>
+          <button
+            onClick={() => navigate(-1)}
+            className="rounded-lg border border-rule px-4 py-2 text-sm font-medium text-ink hover:bg-white transition-colors"
+          >
+            Go back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!question) return null; // guards the brief gap between succeeded status and first render
+
+  const answeredCount = Object.keys(answers).length;
   const isLowTime = timeLeft !== null && timeLeft <= 30;
 
   return (
     <div className="min-h-screen bg-paper flex flex-col">
-      {/* Minimal top bar: exit + progress + timer */}
       <header className="border-b border-rule bg-white sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4 flex items-center gap-4">
           <button
@@ -134,7 +171,6 @@ export default function QuizAttemptPage() {
         </div>
       </header>
 
-      {/* Question */}
       <main className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-2xl">
           <p className="text-sm font-medium text-marigold mb-3">{question.topic}</p>
@@ -143,6 +179,13 @@ export default function QuizAttemptPage() {
             {question.question}
           </h1>
 
+          {submitError && (
+            <div className="flex items-center gap-2 text-sm text-error bg-error/10 border border-error/30 rounded-lg px-4 py-3 mb-6">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {submitError}
+            </div>
+          )}
+
           <div className="space-y-3">
             {question.options.map((option, i) => {
               const isSelected = answers[question.id] === i;
@@ -150,11 +193,11 @@ export default function QuizAttemptPage() {
                 <button
                   key={i}
                   onClick={() => selectOption(i)}
+                  disabled={isSubmitting}
                   className={`w-full flex items-center gap-4 text-left rounded-xl border px-5 py-4
                     transition-colors focus:outline-none focus:ring-4 focus:ring-marigold/20
-                    ${isSelected
-                      ? "border-marigold bg-marigold/10"
-                      : "border-rule bg-white hover:border-ink/30"}`}
+                    disabled:opacity-60
+                    ${isSelected ? "border-marigold bg-marigold/10" : "border-rule bg-white hover:border-ink/30"}`}
                 >
                   <span
                     className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium
@@ -168,11 +211,10 @@ export default function QuizAttemptPage() {
             })}
           </div>
 
-          {/* Nav */}
           <div className="flex items-center justify-between mt-10">
             <button
               onClick={goPrev}
-              disabled={index === 0}
+              disabled={index === 0 || isSubmitting}
               className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft
                 hover:text-ink transition-colors disabled:opacity-0 disabled:pointer-events-none"
             >
@@ -182,18 +224,24 @@ export default function QuizAttemptPage() {
 
             <button
               onClick={goNext}
+              disabled={isSubmitting}
               className="inline-flex items-center gap-1.5 rounded-lg bg-ink text-white font-medium
                 px-5 py-2.5 hover:bg-ink/90 active:scale-[0.99] transition-all
-                focus:outline-none focus:ring-4 focus:ring-marigold/30"
+                focus:outline-none focus:ring-4 focus:ring-marigold/30
+                disabled:opacity-60 disabled:pointer-events-none"
             >
-              {isLast ? `Submit (${answeredCount}/${total} answered)` : "Next"}
-              <ChevronRight className="w-4 h-4" />
+              {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isLast
+                ? isSubmitting
+                  ? "Submitting..."
+                  : `Submit (${answeredCount}/${total} answered)`
+                : "Next"}
+              {!isSubmitting && <ChevronRight className="w-4 h-4" />}
             </button>
           </div>
         </div>
       </main>
 
-      {/* Exit confirmation */}
       {showExitConfirm && (
         <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-6 z-20">
           <div className="bg-white rounded-xl p-6 max-w-sm w-full">
