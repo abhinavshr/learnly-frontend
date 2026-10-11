@@ -13,12 +13,16 @@ export const registerUser = createAsyncThunk(
   "auth/registerUser",
   async ({ name, email, password }, { rejectWithValue }) => {
     try {
-      const res = await apiClient.post("/auth/register", { name, email, password });
+      const res = await apiClient.post("/auth/register", {
+        name,
+        email,
+        password,
+      });
       return res.data; // { token, user }
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error));
     }
-  }
+  },
 );
 
 export const loginUser = createAsyncThunk(
@@ -30,7 +34,7 @@ export const loginUser = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error));
     }
-  }
+  },
 );
 
 // Rehydrates the logged-in user from a token already sitting in the cookie
@@ -44,14 +48,15 @@ export const fetchCurrentUser = createAsyncThunk(
     } catch (error) {
       return rejectWithValue(extractErrorMessage(error));
     }
-  }
+  },
 );
 
 const initialState = {
   user: null,
   token: getToken(),
-  status: "idle", // idle | loading | succeeded | failed
+  status: "idle",
   error: null,
+  isBootstrapping: Boolean(getToken()),
 };
 
 function handlePending(state) {
@@ -96,12 +101,14 @@ const authSlice = createSlice({
       .addCase(loginUser.rejected, handleRejected)
       .addCase(fetchCurrentUser.fulfilled, (state, action) => {
         state.user = action.payload;
+        state.isBootstrapping = false;
       })
       .addCase(fetchCurrentUser.rejected, (state) => {
         // Cookie held a token the backend no longer accepts (expired/invalid)
         state.user = null;
         state.token = null;
         clearToken();
+        state.isBootstrapping = false;
       });
   },
 });

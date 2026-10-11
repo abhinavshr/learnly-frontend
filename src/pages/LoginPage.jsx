@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "../components/AuthLayout.jsx";
@@ -9,6 +9,7 @@ import { loginUser, clearAuthError } from "../features/auth/authSlice.js";
 export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { status, error, token } = useSelector((state) => state.auth);
   const isLoading = status === "loading";
 
@@ -21,8 +22,11 @@ export default function LoginPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (token) navigate("/");
-  }, [token, navigate]);
+    if (token) {
+      const redirectTo = location.state?.from?.pathname || "/";
+      navigate(redirectTo, { replace: true });
+    }
+  }, [token, navigate, location]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
