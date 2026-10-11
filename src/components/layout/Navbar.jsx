@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { BookOpen, Target, Calendar, ChevronDown, LogOut, User } from "lucide-react";
-import { logout } from "../../features/auth/authSlice.js";
+import { logoutUser } from "../../features/auth/authSlice.js";
 
 const NAV_LINKS = [
   { to: "/", label: "Documents", icon: BookOpen, end: true },
@@ -48,9 +48,9 @@ function AuthedNavbar() {
 
   const initial = user?.name?.trim()?.[0]?.toUpperCase() || "U";
 
-  function handleLogout() {
+  async function handleLogout() {
     setMenuOpen(false);
-    dispatch(logout());
+    await dispatch(logoutUser());
     navigate("/login");
   }
 
@@ -73,7 +73,6 @@ function AuthedNavbar() {
         </nav>
       </div>
 
-      {/* Avatar + dropdown */}
       <div className="relative">
         <button
           onClick={() => setMenuOpen((o) => !o)}
@@ -87,7 +86,6 @@ function AuthedNavbar() {
 
         {menuOpen && (
           <>
-            {/* click-away layer */}
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-rule rounded-lg shadow-lg py-1 z-20">
               <p className="px-4 py-2 text-sm text-ink-soft truncate border-b border-rule mb-1">
@@ -117,11 +115,11 @@ function AuthedNavbar() {
 }
 
 export default function Navbar() {
-  const token = useSelector((state) => state.auth.token);
+  const isAuthenticated = useSelector((state) => state.auth.isAuthenticated);
 
   return (
     <header className="border-b border-rule bg-white sticky top-0 z-30">
-      {token ? <AuthedNavbar /> : <GuestNavbar />}
+      {isAuthenticated ? <AuthedNavbar /> : <GuestNavbar />}
     </header>
   );
 }
