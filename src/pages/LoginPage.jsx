@@ -10,7 +10,7 @@ export default function LoginPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
-  const { status, error, token } = useSelector((state) => state.auth);
+  const { status, error, isAuthenticated } = useSelector((state) => state.auth);
   const isLoading = status === "loading";
 
   const [form, setForm] = useState({ email: "", password: "" });
@@ -22,11 +22,11 @@ export default function LoginPage() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (token) {
+    if (isAuthenticated) {
       const redirectTo = location.state?.from?.pathname || "/";
       navigate(redirectTo, { replace: true });
     }
-  }, [token, navigate, location]);
+  }, [isAuthenticated, navigate, location]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });

@@ -3,12 +3,9 @@ import { useSelector } from "react-redux";
 import { Loader2 } from "lucide-react";
 
 export default function ProtectedRoute() {
-  const { token, isBootstrapping } = useSelector((state) => state.auth);
+  const { isAuthenticated, isBootstrapping } = useSelector((state) => state.auth);
   const location = useLocation();
 
-  // A token cookie exists but we haven't confirmed it with the backend yet —
-  // wait rather than redirect, so a refresh on a protected page doesn't bounce
-  // a logged-in user out to /login for a flash of a moment.
   if (isBootstrapping) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center">
@@ -17,8 +14,7 @@ export default function ProtectedRoute() {
     );
   }
 
-  if (!token) {
-    // Remember where they were headed so LoginPage can send them back after signing in
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

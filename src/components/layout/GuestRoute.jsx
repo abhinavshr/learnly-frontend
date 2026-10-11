@@ -3,7 +3,7 @@ import { useSelector } from "react-redux";
 import { Loader2 } from "lucide-react";
 
 export default function GuestRoute() {
-  const { token, isBootstrapping } = useSelector((state) => state.auth);
+  const { isAuthenticated, isBootstrapping } = useSelector((state) => state.auth);
 
   if (isBootstrapping) {
     return (
@@ -13,7 +13,7 @@ export default function GuestRoute() {
     );
   }
 
-  if (token) {
+  if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 

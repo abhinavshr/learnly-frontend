@@ -9,7 +9,7 @@ import { registerUser, clearAuthError } from "../features/auth/authSlice.js";
 export default function RegisterPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { status, error, token } = useSelector((state) => state.auth);
+  const { status, error, isAuthenticated } = useSelector((state) => state.auth);
   const isLoading = status === "loading";
 
   const [form, setForm] = useState({
@@ -20,15 +20,13 @@ export default function RegisterPage() {
   });
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Clear any stale error from a previous attempt when the page mounts
   useEffect(() => {
     dispatch(clearAuthError());
   }, [dispatch]);
 
-  // Once registration succeeds, the store has a token — go to the dashboard
   useEffect(() => {
-    if (token) navigate("/");
-  }, [token, navigate]);
+    if (isAuthenticated) navigate("/");
+  }, [isAuthenticated, navigate]);
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -53,9 +51,7 @@ export default function RegisterPage() {
     setFieldErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    dispatch(
-      registerUser({ name: form.name.trim(), email: form.email.trim(), password: form.password })
-    );
+    dispatch(registerUser({ name: form.name.trim(), email: form.email.trim(), password: form.password }));
   }
 
   return (
