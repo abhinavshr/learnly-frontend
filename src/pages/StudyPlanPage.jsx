@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import {
   ArrowLeft,
   Check,
@@ -8,62 +9,16 @@ import {
   Target,
   Layers,
   BookOpen,
+  Loader2,
+  AlertCircle,
+  Trash2,
 } from "lucide-react";
-
-// Static mock — matches the shape GET /api/study-plans/:id returns
-const PLAN = {
-  title: "Ticketing System exam prep",
-  examDate: "2026-10-15",
-  hoursPerDay: 1.5,
-};
-
-const DAYS = [
-  {
-    dayIndex: 1,
-    date: "2026-09-20",
-    focus: "Start strong by reviewing payments, since that's your weakest area.",
-    isDone: true,
-    tasks: [
-      { type: "weak_topic_quiz", topic: "Payments", minutes: 20 },
-      { type: "read_summary", minutes: 15 },
-    ],
-  },
-  {
-    dayIndex: 2,
-    date: "2026-09-21",
-    focus: "Build on yesterday with a general practice quiz across the document.",
-    isDone: true,
-    tasks: [
-      { type: "practice_quiz", minutes: 20 },
-      { type: "flashcard_review", minutes: 10 },
-    ],
-  },
-  {
-    dayIndex: 3,
-    date: "2026-09-22",
-    focus: "Revisit tournament formats, then a quick flashcard pass.",
-    isDone: false,
-    tasks: [
-      { type: "weak_topic_quiz", topic: "Tournament formats", minutes: 20 },
-      { type: "flashcard_review", minutes: 10 },
-      { type: "read_summary", minutes: 15 },
-    ],
-  },
-  {
-    dayIndex: 4,
-    date: "2026-09-23",
-    focus: "A full practice quiz to check how everything is sticking.",
-    isDone: false,
-    tasks: [{ type: "practice_quiz", minutes: 30 }],
-  },
-  {
-    dayIndex: 15,
-    date: "2026-10-04",
-    focus: "Light review only — no new material the day before.",
-    isDone: false,
-    tasks: [{ type: "final_review", minutes: 45 }],
-  },
-];
+import {
+  fetchPlanById,
+  updateDayDone,
+  deletePlan,
+  clearCurrentPlan,
+} from "../features/studyPlans/studyPlansSlice.js";
 
 const TASK_CONFIG = {
   weak_topic_quiz: { icon: AlertTriangle, label: "Quiz your weak topic", color: "text-error bg-error/10" },
@@ -79,51 +34,92 @@ function formatDate(dateStr) {
 
 export default function StudyPlanPage() {
   const { id } = useParams();
-  const [days, setDays] = useState(DAYS);
-  const [selectedIndex, setSelectedIndex] = useState(() => {
-    const firstUnfinished = DAYS.findIndex((d) => !d.isDone);
-    return firstUnfinished === -1 ? 0 : firstUnfinished;
-  });
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const { plan, days, status, error } = useSelector((state) => state.studyPlans.current);
+  const { deletingId } = useSelector((state) => state.studyPlans);
 
-  const selectedDay = days[selectedIndex];
-  const completedCount = days.filter((d) => d.isDone).length;
-  const progressPct = Math.round((completedCount / days.length) * 100);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  function toggleDayDone(index) {
-    setDays((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, isDone: !d.isDone } : d))
+  useEffect(() => {
+    dispatch(fetchPlanById(id));
+    return () => dispatch(clearCurrentPlan());
+  }, [dispatch, id]);
+
+  // Default the selected day to the first unfinished one once days load
+  useEffect(() => {
+    if (status === "succeeded" && days.length > 0) {
+      const firstUnfinished = days.findIndex((d) => !d.isDone);
+      setSelectedIndex(firstUnfinished === -1 ? 0 : firstUnfinished);
+    }
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function toggleDayDone(day) {
+    dispatch(updateDayDone({ planId: plan.id, dayIndex: day.dayIndex, isDone: !day.isDone }));
+  }
+
+  async function handleDelete() {
+    const result = await dispatch(deletePlan(plan.id));
+    if (deletePlan.fulfilled.match(result)) {
+      navigate("/study-plans");
+    }
+  }
+
+  if (status === "loading" || status === "idle") {
+    return (
+      <main className="max-w-4xl mx-auto px-6 py-10 w-full flex items-center justify-center">
+        <Loader2 className="w-6 h-6 text-ink-soft animate-spin" />
+      </main>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-paper">
-
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <Link
-          to="/study-plans"
-          className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink transition-colors mb-4"
-        >
+  if (status === "failed") {
+    return (
+      <main className="max-w-4xl mx-auto px-6 py-10 w-full">
+        <Link to="/study-plans" className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink transition-colors mb-6">
           <ArrowLeft className="w-4 h-4" />
           Back to study plans
         </Link>
-
-        <div className="flex items-start justify-between mb-2">
-          <h1 className="font-serif text-3xl font-semibold text-ink">{PLAN.title}</h1>
+        <div className="flex items-center gap-2 text-sm text-error bg-error/10 border border-error/30 rounded-lg px-4 py-3">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          {error}
         </div>
-        <p className="text-ink-soft mb-6">
-          Exam on {formatDate(PLAN.examDate)} · {PLAN.hoursPerDay}h/day · {completedCount}/{days.length} days done
-        </p>
+      </main>
+    );
+  }
 
-        {/* Overall progress */}
-        <div className="h-2 rounded-full bg-rule/50 overflow-hidden mb-8">
-          <div
-            className="h-full rounded-full bg-marigold transition-all duration-500"
-            style={{ width: `${progressPct}%` }}
-          />
-        </div>
+  const selectedDay = days[selectedIndex];
+  const completedCount = days.filter((d) => d.isDone).length;
+  const progressPct = days.length > 0 ? Math.round((completedCount / days.length) * 100) : 0;
 
+  return (
+    <main className="max-w-4xl mx-auto px-6 py-8 w-full">
+      <Link to="/study-plans" className="inline-flex items-center gap-1.5 text-sm text-ink-soft hover:text-ink transition-colors mb-4">
+        <ArrowLeft className="w-4 h-4" />
+        Back to study plans
+      </Link>
+
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <h1 className="font-serif text-3xl font-semibold text-ink">{plan.title}</h1>
+        <button
+          onClick={() => setShowDeleteConfirm(true)}
+          className="shrink-0 inline-flex items-center gap-1.5 text-sm text-error hover:text-error/80 transition-colors"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete plan
+        </button>
+      </div>
+      <p className="text-ink-soft mb-6">
+        Exam on {formatDate(plan.examDate)} · {plan.hoursPerDay}h/day · {completedCount}/{days.length} days done
+      </p>
+
+      <div className="h-2 rounded-full bg-rule/50 overflow-hidden mb-8">
+        <div className="h-full rounded-full bg-marigold transition-all duration-500" style={{ width: `${progressPct}%` }} />
+      </div>
+
+      {selectedDay && (
         <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6">
-          {/* Day list sidebar */}
           <div className="rounded-xl border border-rule bg-white overflow-hidden h-fit md:max-h-[520px] md:overflow-y-auto">
             {days.map((day, i) => {
               const isSelected = i === selectedIndex;
@@ -131,8 +127,7 @@ export default function StudyPlanPage() {
                 <button
                   key={day.dayIndex}
                   onClick={() => setSelectedIndex(i)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-rule
-                    last:border-b-0 transition-colors
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-rule last:border-b-0 transition-colors
                     ${isSelected ? "bg-marigold/10" : "hover:bg-paper"}`}
                 >
                   <span
@@ -152,7 +147,6 @@ export default function StudyPlanPage() {
             })}
           </div>
 
-          {/* Selected day detail */}
           <div className="bg-white border border-rule rounded-xl p-6">
             <div className="flex items-center justify-between mb-1">
               <h2 className="font-serif text-xl font-semibold text-ink">
@@ -162,7 +156,7 @@ export default function StudyPlanPage() {
                 <input
                   type="checkbox"
                   checked={selectedDay.isDone}
-                  onChange={() => toggleDayDone(selectedIndex)}
+                  onChange={() => toggleDayDone(selectedDay)}
                   className="w-4 h-4 rounded border-rule accent-[#E8A33D]"
                 />
                 Mark done
@@ -172,12 +166,13 @@ export default function StudyPlanPage() {
 
             <div className="space-y-3">
               {selectedDay.tasks.map((task, i) => {
-                const config = TASK_CONFIG[task.type];
+                const config = TASK_CONFIG[task.type] ?? TASK_CONFIG.final_review;
                 const Icon = config.icon;
                 return (
-                  <div
+                  <Link
                     key={i}
-                    className="flex items-center gap-3 rounded-lg border border-rule px-4 py-3"
+                    to={task.documentId ? `/documents/${task.documentId}` : "/study-plans"}
+                    className="flex items-center gap-3 rounded-lg border border-rule px-4 py-3 hover:bg-paper transition-colors"
                   >
                     <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${config.color}`}>
                       <Icon className="w-4 h-4" />
@@ -187,13 +182,38 @@ export default function StudyPlanPage() {
                       {task.topic && <p className="text-xs text-ink-soft">{task.topic}</p>}
                     </div>
                     <span className="text-xs text-ink-soft shrink-0">{task.minutes} min</span>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
           </div>
         </div>
-      </main>
-    </div>
+      )}
+
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-6 z-40">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full">
+            <h2 className="font-serif text-xl font-semibold text-ink mb-2">Delete this plan?</h2>
+            <p className="text-ink-soft text-sm mb-6">This can't be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 rounded-lg border border-rule py-2.5 text-sm font-medium text-ink hover:bg-paper transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deletingId === plan.id}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-error text-white py-2.5 text-sm font-medium hover:bg-error/90 transition-colors disabled:opacity-50"
+              >
+                {deletingId === plan.id && <Loader2 className="w-4 h-4 animate-spin" />}
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </main>
   );
 }
